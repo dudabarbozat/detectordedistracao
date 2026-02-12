@@ -6,6 +6,7 @@ from time import perf_counter
 
 import cv2
 
+from .control import adjust_config_from_key
 from .logic import AttentionState, DetectorConfig, FrameCounters, FrameSignals, update_frame_counters
 from .smoothing import TemporalStateSmoother
 
@@ -64,6 +65,21 @@ class DetectorPipeline:
         raw_state = self._evaluate(signals)
         return self.smoother.push(raw_state)
 
+    def apply_realtime_control(self, key_code: int) -> bool:
+        result = adjust_config_from_key(self.detector_config, key_code)
+        if not result.changed:
+            return False
+
+        old_window = self.detector_config.smoothing_window_size
+        self.detector_config = result.config
+        if self.detector_config.smoothing_window_size != old_window:
+            self.smoother = TemporalStateSmoother(self.detector_config.smoothing_window_size)
+
+        if result.message:
+            LOGGER.info("runtime_control %s", result.message)
+
+        return True
+
     def _evaluate(self, signals: FrameSignals) -> AttentionState:
         from .logic import evaluate_attention
 
@@ -102,3 +118,17 @@ def draw_status(frame: cv2.typing.MatLike, status: AttentionState) -> None:
         2,
         cv2.LINE_AA,
     )
+
+
+def draw_runtime_controls(frame: cv2.typing.MatLike, config: DetectorConfig) -> None:
+    lines = [
+        f"1/2 no_face: {config.no_face_frames_threshold}",
+        f"3/4 eyes_closed: {config.eyes_closed_frames_threshold}",
+        f"5/6 center_offset: {config.max_center_offset_ratio:.2f}",
+        f"7/8 smoothing: {config.smoothing_window_size}",
+    ]
+
+    y = 65
+    for line in lines:
+        cv2.putText(frame, line, (20, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (230, 230, 230), 1, cv2.LINE_AA)
+        y += 22

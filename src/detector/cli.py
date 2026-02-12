@@ -6,7 +6,7 @@ import logging
 import cv2
 
 from .config import load_app_config
-from .pipeline import DetectorPipeline, draw_status
+from .pipeline import DetectorPipeline, draw_runtime_controls, draw_status
 
 
 def _load_cascades() -> tuple[cv2.CascadeClassifier, cv2.CascadeClassifier]:
@@ -56,11 +56,14 @@ def main() -> None:
             inference_result = pipeline.infer_signals(frame)
             status = pipeline.post_process(inference_result.signals)
             draw_status(inference_result.frame, status)
+            draw_runtime_controls(inference_result.frame, pipeline.detector_config)
             pipeline.log_metrics()
 
             cv2.imshow("Detector de Distração", inference_result.frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            key_code = cv2.waitKey(1) & 0xFF
+            if key_code == ord("q"):
                 break
+            pipeline.apply_realtime_control(key_code)
     finally:
         cap.release()
         cv2.destroyAllWindows()

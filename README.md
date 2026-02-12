@@ -38,6 +38,10 @@ detector-distracao --config detector.toml --log-level DEBUG
 Teclas:
 
 - `q`: sair
+- `1`/`2`: diminuir/aumentar limiar de sem rosto
+- `3`/`4`: diminuir/aumentar limiar de olhos fechados
+- `5`/`6`: diminuir/aumentar tolerância de desvio do centro
+- `7`/`8`: diminuir/aumentar janela de suavização temporal
 
 ## Configuração (`detector.toml`)
 
