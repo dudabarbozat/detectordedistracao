@@ -17,33 +17,49 @@ MVP de detector de distração em tempo real usando webcam ou vídeo.
 
 ## Instalação
 
+### Opção A (recomendada para desenvolvimento)
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
 ```
 
+### Opção B (instalação simples)
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install opencv-python pytest
+```
+
 ## Execução
 
-### 1) Webcam padrão
+### 1) Ajuda da CLI
+
+```bash
+detector-distracao --help
+```
+
+### 2) Webcam padrão
 
 ```bash
 detector-distracao
 ```
 
-### 2) Outra câmera
+### 3) Outra câmera
 
 ```bash
 detector-distracao --camera 1
 ```
 
-### 3) Testar com arquivo de vídeo
+### 4) Testar com arquivo de vídeo
 
 ```bash
 detector-distracao --source caminho/para/video.mp4
 ```
 
-### 4) Ajustar sensibilidade
+### 5) Ajustar sensibilidade
 
 ```bash
 detector-distracao \
@@ -51,6 +67,13 @@ detector-distracao \
   --eyes-closed-threshold 25 \
   --center-offset-threshold 0.25
 ```
+
+Regras de validação da CLI:
+
+- `--camera >= 0`
+- `--no-face-threshold > 0`
+- `--eyes-closed-threshold > 0`
+- `--center-offset-threshold` entre `0.0` e `0.5`
 
 Teclas:
 
@@ -68,6 +91,7 @@ Cobertura atual:
 
 - Regras de decisão da função `evaluate_attention`.
 - Comportamento temporal do `AttentionTracker` (acúmulo e reset de contadores).
+- Validação dos argumentos da CLI e erro amigável quando OpenCV não está instalado.
 
 ### Teste manual (com webcam)
 
@@ -76,6 +100,14 @@ Cobertura atual:
    - Saia da frente da câmera por alguns segundos (esperado: `distraido_sem_rosto`).
    - Feche os olhos por alguns frames (esperado: `distraido_olhos_fechados`).
    - Vá para o canto da imagem (esperado: `distraido_olhando_longe`).
+
+## Troubleshooting
+
+- **Erro `OpenCV não está instalado`**:
+  - execute `pip install opencv-python`.
+- **Ambiente sem acesso à internet/proxy**:
+  - prefira usar um ambiente local com internet para instalar dependências;
+  - ou use wheel local previamente baixado.
 
 ## Como evoluir
 
@@ -107,4 +139,5 @@ src/detector/
 tests/
   test_logic.py
   test_tracker.py
+  test_cli.py
 ```

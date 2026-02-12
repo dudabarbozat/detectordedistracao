@@ -1,24 +1,13 @@
 from __future__ import annotations
 
 import argparse
-
-import cv2
+from typing import TYPE_CHECKING, Any
 
 from .logic import AttentionState, DetectorConfig, FrameSignals
 from .tracker import AttentionTracker
 
-
-def _load_cascades() -> tuple[cv2.CascadeClassifier, cv2.CascadeClassifier]:
-    face_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-    eye_path = cv2.data.haarcascades + "haarcascade_eye.xml"
-
-    face_cascade = cv2.CascadeClassifier(face_path)
-    eye_cascade = cv2.CascadeClassifier(eye_path)
-
-    if face_cascade.empty() or eye_cascade.empty():
-        raise RuntimeError("Não foi possível carregar os classificadores Haar do OpenCV.")
-
-    return face_cascade, eye_cascade
+if TYPE_CHECKING:
+    import cv2
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -36,22 +25,67 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _put_status(frame, status: AttentionState) -> None:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    _validate_args(parser, args)
+    return args
+
+
+def _validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if args.camera < 0:
+        parser.error("--camera deve ser >= 0")
+
+    if args.no_face_threshold <= 0:
+        parser.error("--no-face-threshold deve ser > 0")
+
+    if args.eyes_closed_threshold <= 0:
+        parser.error("--eyes-closed-threshold deve ser > 0")
+
+    if not 0.0 <= args.center_offset_threshold <= 0.5:
+        parser.error("--center-offset-threshold deve estar entre 0.0 e 0.5")
+
+
+def _import_cv2() -> Any:
+    try:
+        import cv2  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "OpenCV não está instalado. Instale com `pip install opencv-python` "
+            "(ou `pip install -e .[dev]`) e tente novamente."
+        ) from exc
+    return cv2
+
+
+def _load_cascades(cv2_module: Any) -> tuple[Any, Any]:
+    face_path = cv2_module.data.haarcascades + "haarcascade_frontalface_default.xml"
+    eye_path = cv2_module.data.haarcascades + "haarcascade_eye.xml"
+
+    face_cascade = cv2_module.CascadeClassifier(face_path)
+    eye_cascade = cv2_module.CascadeClassifier(eye_path)
+
+    if face_cascade.empty() or eye_cascade.empty():
+        raise RuntimeError("Não foi possível carregar os classificadores Haar do OpenCV.")
+
+    return face_cascade, eye_cascade
+
+
+def _put_status(cv2_module: Any, frame: Any, status: AttentionState) -> None:
     color = (0, 200, 0) if status == AttentionState.ATTENTIVE else (0, 0, 255)
-    cv2.putText(
+    cv2_module.putText(
         frame,
         f"Estado: {status.value}",
         (20, 35),
-        cv2.FONT_HERSHEY_SIMPLEX,
+        cv2_module.FONT_HERSHEY_SIMPLEX,
         0.9,
         color,
         2,
-        cv2.LINE_AA,
+        cv2_module.LINE_AA,
     )
 
 
 def main() -> None:
-    args = _build_parser().parse_args()
+    args = parse_args()
     config = DetectorConfig(
         no_face_frames_threshold=args.no_face_threshold,
         eyes_closed_frames_threshold=args.eyes_closed_threshold,
@@ -59,7 +93,8 @@ def main() -> None:
     )
     tracker = AttentionTracker(config=config)
 
-    face_cascade, eye_cascade = _load_cascades()
+    cv2 = _import_cv2()
+    face_cascade, eye_cascade = _load_cascades(cv2)
 
     source = args.source if args.source is not None else args.camera
     cap = cv2.VideoCapture(source)
@@ -99,7 +134,7 @@ def main() -> None:
             )
             status = tracker.update(signals)
 
-            _put_status(frame, status)
+            _put_status(cv2, frame, status)
             cv2.imshow("Detector de Distração", frame)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
