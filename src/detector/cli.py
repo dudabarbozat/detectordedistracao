@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import argparse
+import logging
+
 import cv2
 
-from .logic import AttentionState, DetectorConfig, FrameSignals, evaluate_attention
+from .config import load_app_config
+from .notify import DistractionVideoNotifier
+from .pipeline import DetectorPipeline, draw_runtime_controls, draw_status
+
+DEFAULT_DISTRACTION_VIDEO_URL = "https://www.youtube.com/shorts/3tSGAhyQAKA"
 
 
 def _load_cascades() -> tuple[cv2.CascadeClassifier, cv2.CascadeClassifier]:
@@ -18,30 +25,41 @@ def _load_cascades() -> tuple[cv2.CascadeClassifier, cv2.CascadeClassifier]:
     return face_cascade, eye_cascade
 
 
-def _put_status(frame, status: AttentionState) -> None:
-    color = (0, 200, 0) if status == AttentionState.ATTENTIVE else (0, 0, 255)
-    cv2.putText(
-        frame,
-        f"Estado: {status.value}",
-        (20, 35),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.9,
-        color,
-        2,
-        cv2.LINE_AA,
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Detector de distração em tempo real.")
+    parser.add_argument("--config", default="detector.toml", help="Caminho para arquivo de configuração TOML.")
+    parser.add_argument("--log-level", default="INFO", help="Nível de log (DEBUG, INFO, WARNING, ERROR).")
+    parser.add_argument(
+        "--distraction-video-url",
+        default=DEFAULT_DISTRACTION_VIDEO_URL,
+        help="URL (ex.: YouTube) para abrir ao detectar distração.",
     )
+    parser.add_argument("--video-cooldown-seconds", type=float, default=60.0, help="Cooldown mínimo entre aberturas do vídeo.")
+    return parser
 
 
 def main() -> None:
-    config = DetectorConfig()
+    args = _build_parser().parse_args()
+    logging.basicConfig(level=args.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+    app_config = load_app_config(args.config)
     face_cascade, eye_cascade = _load_cascades()
 
-    cap = cv2.VideoCapture(0)
+    pipeline = DetectorPipeline(
+        face_cascade=face_cascade,
+        eye_cascade=eye_cascade,
+        detector_config=app_config.detector,
+        metrics_log_interval_frames=app_config.runtime.metrics_log_interval_frames,
+    )
+
+    notifier = DistractionVideoNotifier(
+        video_url=args.distraction_video_url,
+        cooldown_seconds=max(args.video_cooldown_seconds, 0.0),
+    )
+
+    cap = cv2.VideoCapture(app_config.runtime.camera_index)
     if not cap.isOpened():
         raise RuntimeError("Não foi possível abrir a webcam.")
-
-    consecutive_no_face_frames = 0
-    consecutive_eyes_closed_frames = 0
 
     try:
         while True:
@@ -49,46 +67,19 @@ def main() -> None:
             if not ok:
                 break
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(60, 60))
+            inference_result = pipeline.infer_signals(frame)
+            status = pipeline.post_process(inference_result.signals)
+            draw_status(inference_result.frame, status)
+            draw_runtime_controls(inference_result.frame, pipeline.detector_config)
+            if notifier.handle_state(status):
+                logging.getLogger(__name__).info("video_aberto_em_distraction url=%s", args.distraction_video_url)
+            pipeline.log_metrics()
 
-            has_face = len(faces) > 0
-            has_eyes = False
-            face_center_x_ratio = None
-
-            if has_face:
-                x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
-                face_center_x_ratio = (x + w / 2) / frame.shape[1]
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 180, 0), 2)
-
-                roi_gray = gray[y : y + h, x : x + w]
-                roi_color = frame[y : y + h, x : x + w]
-                eyes = eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=8, minSize=(20, 20))
-                has_eyes = len(eyes) >= 1
-
-                for ex, ey, ew, eh in eyes[:2]:
-                    cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (0, 255, 255), 2)
-
-            consecutive_no_face_frames = consecutive_no_face_frames + 1 if not has_face else 0
-            consecutive_eyes_closed_frames = consecutive_eyes_closed_frames + 1 if has_face and not has_eyes else 0
-
-            signals = FrameSignals(
-                has_face=has_face,
-                has_eyes=has_eyes,
-                face_center_x_ratio=face_center_x_ratio,
-            )
-            status = evaluate_attention(
-                signals=signals,
-                consecutive_no_face_frames=consecutive_no_face_frames,
-                consecutive_eyes_closed_frames=consecutive_eyes_closed_frames,
-                config=config,
-            )
-
-            _put_status(frame, status)
-            cv2.imshow("Detector de Distração", frame)
-
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            cv2.imshow("Detector de Distração", inference_result.frame)
+            key_code = cv2.waitKey(1) & 0xFF
+            if key_code == ord("q"):
                 break
+            pipeline.apply_realtime_control(key_code)
     finally:
         cap.release()
         cv2.destroyAllWindows()
