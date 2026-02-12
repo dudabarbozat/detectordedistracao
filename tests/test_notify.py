@@ -19,6 +19,11 @@ class FakeOpener:
         return True
 
 
+class FailingOpener:
+    def __call__(self, _: str) -> bool:
+        raise RuntimeError("sem browser")
+
+
 def test_notifier_opens_on_transition_to_distracted() -> None:
     clock = FakeClock()
     opener = FakeOpener()
@@ -68,6 +73,17 @@ def test_notifier_allows_manual_open_for_testing() -> None:
     assert notifier.open_now() is True
     clock.value = 1.0
     assert notifier.open_now() is False
+    assert notifier.last_error == "cooldown_active"
+
+
+def test_notifier_uses_fallback_when_primary_opener_fails() -> None:
+    notifier = DistractionVideoNotifier(
+        video_url="https://youtube.com/watch?v=test",
+        opener=FailingOpener(),
+    )
+    notifier._fallback_open = lambda _: True  # type: ignore[method-assign]
+
+    assert notifier.open_now() is True
 
 
 def test_notifier_ignores_when_url_is_missing() -> None:
@@ -75,3 +91,4 @@ def test_notifier_ignores_when_url_is_missing() -> None:
 
     assert notifier.handle_state(AttentionState.DISTRACTED_NO_FACE) is False
     assert notifier.open_now() is False
+    assert notifier.last_error == "missing_video_url"

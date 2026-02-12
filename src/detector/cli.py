@@ -56,6 +56,8 @@ def main() -> None:
         video_url=args.distraction_video_url,
         cooldown_seconds=max(args.video_cooldown_seconds, 0.0),
     )
+    logger = logging.getLogger(__name__)
+    logger.info("video_alerta_configurado url=%s cooldown=%.1fs", args.distraction_video_url, args.video_cooldown_seconds)
 
     cap = cv2.VideoCapture(app_config.runtime.camera_index)
     if not cap.isOpened():
@@ -71,7 +73,6 @@ def main() -> None:
             status = pipeline.post_process(inference_result.signals)
             draw_status(inference_result.frame, status)
             draw_runtime_controls(inference_result.frame, pipeline.detector_config)
-            logger = logging.getLogger(__name__)
             if notifier.handle_state(status):
                 logger.info("video_aberto_em_distraction url=%s", args.distraction_video_url)
             pipeline.log_metrics()
@@ -84,7 +85,12 @@ def main() -> None:
                 if notifier.open_now():
                     logger.info("video_aberto_em_teste_manual url=%s", args.distraction_video_url)
                 else:
-                    logger.warning("falha_ao_abrir_video_teste url=%s cooldown=%.1fs", args.distraction_video_url, args.video_cooldown_seconds)
+                    logger.warning(
+                        "falha_ao_abrir_video_teste url=%s cooldown=%.1fs motivo=%s",
+                        args.distraction_video_url,
+                        args.video_cooldown_seconds,
+                        notifier.last_error,
+                    )
                 continue
             pipeline.apply_realtime_control(key_code)
     finally:
