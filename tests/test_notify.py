@@ -1,5 +1,5 @@
 from detector.logic import AttentionState
-from detector.notify import DistractionVideoNotifier
+from detector.notify import DistractionVideoNotifier, open_video_url
 
 
 class FakeClock:
@@ -59,3 +59,26 @@ def test_notifier_ignores_when_url_is_missing() -> None:
     notifier = DistractionVideoNotifier(video_url=None)
 
     assert notifier.handle_state(AttentionState.DISTRACTED_NO_FACE) is False
+
+
+def test_open_video_url_uses_webbrowser_when_available(monkeypatch) -> None:
+    monkeypatch.setattr("detector.notify.webbrowser.open", lambda *args, **kwargs: True)
+
+    assert open_video_url("https://example.com") is True
+
+
+def test_open_video_url_uses_platform_fallback(monkeypatch) -> None:
+    monkeypatch.setattr("detector.notify.webbrowser.open", lambda *args, **kwargs: False)
+    monkeypatch.setattr("detector.notify.platform.system", lambda: "Linux")
+    monkeypatch.setattr("detector.notify.which", lambda cmd: "/usr/bin/xdg-open")
+
+    called = {"value": False}
+
+    def fake_run(*args, **kwargs):
+        called["value"] = True
+        return None
+
+    monkeypatch.setattr("detector.notify.subprocess.run", fake_run)
+
+    assert open_video_url("https://example.com") is True
+    assert called["value"] is True
