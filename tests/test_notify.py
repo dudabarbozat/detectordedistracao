@@ -1,3 +1,5 @@
+import subprocess
+
 from detector.logic import AttentionState
 from detector.notify import DistractionVideoNotifier
 
@@ -22,6 +24,14 @@ class FakeOpener:
 class FailingOpener:
     def __call__(self, _: str) -> bool:
         raise RuntimeError("sem browser")
+
+
+def _runner_ok(*_args, **_kwargs) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(args=["xdg-open"], returncode=0, stdout="", stderr="")
+
+
+def _runner_fail(*_args, **_kwargs) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(args=["xdg-open"], returncode=3, stdout="", stderr="erro de abertura")
 
 
 def test_notifier_opens_on_transition_to_distracted() -> None:
@@ -80,10 +90,35 @@ def test_notifier_uses_fallback_when_primary_opener_fails() -> None:
     notifier = DistractionVideoNotifier(
         video_url="https://youtube.com/watch?v=test",
         opener=FailingOpener(),
+        command_runner=_runner_ok,
+        env_getter=lambda _: ":0",
     )
-    notifier._fallback_open = lambda _: True  # type: ignore[method-assign]
 
     assert notifier.open_now() is True
+
+
+def test_notifier_reports_headless_environment() -> None:
+    notifier = DistractionVideoNotifier(
+        video_url="https://youtube.com/watch?v=test",
+        opener=lambda _: False,
+        env_getter=lambda _: None,
+    )
+
+    assert notifier.open_now() is False
+    assert notifier.last_error == "headless_environment_missing_display"
+
+
+def test_notifier_reports_fallback_command_failure() -> None:
+    notifier = DistractionVideoNotifier(
+        video_url="https://youtube.com/watch?v=test",
+        opener=lambda _: False,
+        command_runner=_runner_fail,
+        env_getter=lambda _: ":0",
+    )
+
+    assert notifier.open_now() is False
+    assert notifier.last_error is not None
+    assert notifier.last_error.startswith("fallback_command_failed:")
 
 
 def test_notifier_ignores_when_url_is_missing() -> None:

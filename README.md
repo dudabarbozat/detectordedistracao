@@ -40,7 +40,8 @@ O app abre por padrão o vídeo `https://www.youtube.com/shorts/3tSGAhyQAKA` qua
 Você pode trocar com `--distraction-video-url` e usar `--video-cooldown-seconds` para controlar intervalo mínimo entre aberturas.
 Para teste rápido, pressione `v` para forçar abertura manual do vídeo (respeita cooldown).
 
-Se não abrir, rode com `--log-level DEBUG` e pressione `v`: o log vai mostrar o motivo (`motivo=...`), por exemplo `cooldown_active` ou falha do browser do sistema.
+Se não abrir, rode com `--log-level DEBUG` e pressione `v`: o log vai mostrar o motivo (`motivo=...`).
+Exemplos: `cooldown_active`, `headless_environment_missing_display`, `fallback_command_failed:xdg-open:...`.
 
 
 Teclas:
