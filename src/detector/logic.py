@@ -13,10 +13,10 @@ class AttentionState(str, Enum):
 
 @dataclass(frozen=True)
 class DetectorConfig:
-    no_face_frames_threshold: int = 30
-    eyes_closed_frames_threshold: int = 20
-    max_center_offset_ratio: float = 0.30
-    smoothing_window_size: int = 5
+    no_face_frames_threshold: int = 15
+    eyes_closed_frames_threshold: int = 12
+    max_center_offset_ratio: float = 0.24
+    smoothing_window_size: int = 3
 
 
 @dataclass(frozen=True)
@@ -30,6 +30,7 @@ class FrameSignals:
     has_face: bool
     has_eyes: bool
     face_center_x_ratio: float | None
+    face_center_y_ratio: float | None
 
 
 @dataclass(frozen=True)
@@ -65,9 +66,10 @@ def evaluate_attention(
     if not signals.has_eyes and consecutive_eyes_closed_frames >= config.eyes_closed_frames_threshold:
         return AttentionState.DISTRACTED_EYES_CLOSED
 
-    if signals.face_center_x_ratio is not None:
-        center_offset = abs(signals.face_center_x_ratio - 0.5)
-        if center_offset > config.max_center_offset_ratio:
+    if signals.face_center_x_ratio is not None and signals.face_center_y_ratio is not None:
+        horizontal_offset = abs(signals.face_center_x_ratio - 0.5)
+        vertical_offset = abs(signals.face_center_y_ratio - 0.5)
+        if max(horizontal_offset, vertical_offset) > config.max_center_offset_ratio:
             return AttentionState.DISTRACTED_LOOKING_AWAY
 
     return AttentionState.ATTENTIVE

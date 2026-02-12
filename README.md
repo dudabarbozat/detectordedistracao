@@ -40,6 +40,9 @@ detector-distracao --config detector.toml --log-level DEBUG \
 Se passar `--distraction-video-url`, o app abre o link (YouTube ou outro) quando há transição de **atento -> distraído**.
 Use `--video-cooldown-seconds` para controlar intervalo mínimo entre aberturas.
 
+
+Dica para calibrar rapidamente: durante a execução, pressione `1`, `3`, `5` e `7` para deixar a detecção mais sensível (limiares menores e menos suavização).
+
 Teclas:
 
 - `q`: sair
@@ -52,10 +55,10 @@ Teclas:
 
 ```toml
 [detector]
-no_face_frames_threshold = 30
-eyes_closed_frames_threshold = 20
-max_center_offset_ratio = 0.30
-smoothing_window_size = 5
+no_face_frames_threshold = 15
+eyes_closed_frames_threshold = 12
+max_center_offset_ratio = 0.24
+smoothing_window_size = 3
 
 [runtime]
 camera_index = 0
