@@ -17,13 +17,19 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source", type=str, default=None, help="Arquivo de vídeo para teste (opcional)")
     parser.add_argument("--no-face-threshold", type=float, default=1.2, help="Segundos sem rosto para alertar")
     parser.add_argument("--eyes-closed-threshold", type=float, default=0.8, help="Segundos com olhos fechados")
-    parser.add_argument("--looking-away-threshold", type=float, default=1.0, help="Segundos olhando para longe")
+    parser.add_argument("--looking-away-threshold", type=float, default=0.6, help="Segundos olhando para longe")
     parser.add_argument("--recover-threshold", type=float, default=0.4, help="Segundos atentos para sair de alerta")
     parser.add_argument(
-        "--center-offset-threshold",
+        "--center-offset-x-threshold",
         type=float,
-        default=0.30,
-        help="Desvio máximo do centro (0 a 0.5) antes de alertar",
+        default=0.22,
+        help="Desvio horizontal máximo do centro (0 a 0.5) antes de alertar",
+    )
+    parser.add_argument(
+        "--center-offset-y-threshold",
+        type=float,
+        default=0.20,
+        help="Desvio vertical máximo do centro (0 a 0.5) antes de alertar",
     )
     return parser
 
@@ -51,8 +57,11 @@ def _validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) ->
     if args.recover_threshold <= 0:
         parser.error("--recover-threshold deve ser > 0")
 
-    if not 0.0 <= args.center_offset_threshold <= 0.5:
-        parser.error("--center-offset-threshold deve estar entre 0.0 e 0.5")
+    if not 0.0 <= args.center_offset_x_threshold <= 0.5:
+        parser.error("--center-offset-x-threshold deve estar entre 0.0 e 0.5")
+
+    if not 0.0 <= args.center_offset_y_threshold <= 0.5:
+        parser.error("--center-offset-y-threshold deve estar entre 0.0 e 0.5")
 
 
 def _import_cv2() -> Any:
@@ -73,14 +82,19 @@ def _put_status(cv2_module: Any, frame: Any, status: AttentionState) -> None:
         f"Estado: {status.value}",
         (20, 35),
         cv2_module.FONT_HERSHEY_SIMPLEX,
-        0.9,
+        0.8,
         color,
         2,
         cv2_module.LINE_AA,
     )
 
 
-def _draw_detections(cv2_module: Any, frame: Any, face_box: tuple[int, int, int, int] | None, eye_boxes: list[tuple[int, int, int, int]]) -> None:
+def _draw_detections(
+    cv2_module: Any,
+    frame: Any,
+    face_box: tuple[int, int, int, int] | None,
+    eye_boxes: list[tuple[int, int, int, int]],
+) -> None:
     if face_box is not None:
         x, y, w, h = face_box
         cv2_module.rectangle(frame, (x, y), (x + w, y + h), (255, 180, 0), 2)
@@ -96,7 +110,8 @@ def main() -> None:
         eyes_closed_seconds_threshold=args.eyes_closed_threshold,
         looking_away_seconds_threshold=args.looking_away_threshold,
         recover_seconds_threshold=args.recover_threshold,
-        max_center_offset_ratio=args.center_offset_threshold,
+        max_center_offset_x_ratio=args.center_offset_x_threshold,
+        max_center_offset_y_ratio=args.center_offset_y_threshold,
     )
     tracker = AttentionTracker(config=config)
 

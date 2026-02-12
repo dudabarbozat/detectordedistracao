@@ -26,9 +26,10 @@ class AttentionTracker:
         self.eyes_closed_seconds = self.eyes_closed_seconds + dt if signals.has_face and not signals.has_eyes else 0.0
 
         is_looking_away = False
-        if signals.face_center_x_ratio is not None and signals.has_face:
-            center_offset = abs(signals.face_center_x_ratio - 0.5)
-            is_looking_away = center_offset > self.config.max_center_offset_ratio
+        if signals.face_center_x_ratio is not None and signals.face_center_y_ratio is not None and signals.has_face:
+            dx = abs(signals.face_center_x_ratio - 0.5)
+            dy = abs(signals.face_center_y_ratio - 0.5)
+            is_looking_away = dx > self.config.max_center_offset_x_ratio or dy > self.config.max_center_offset_y_ratio
         self.looking_away_seconds = self.looking_away_seconds + dt if is_looking_away else 0.0
 
         raw_state = evaluate_attention(

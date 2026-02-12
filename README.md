@@ -6,7 +6,8 @@ Detector de distração em tempo real usando webcam ou vídeo, com foco em confi
 
 - **Sem rosto visível** por um período contínuo (em segundos).
 - **Olhos fechados** por um período contínuo (em segundos).
-- **Rosto fora do centro** por um período contínuo (em segundos).
+- **Olhar para os lados** (esquerda/direita) por tempo contínuo.
+- **Olhar para cima ou para baixo** por tempo contínuo.
 - **Recuperação com histerese**: precisa manter atenção por alguns segundos antes de sair de alerta.
 
 ## Requisitos
@@ -58,9 +59,10 @@ detector-distracao --source caminho/para/video.mp4
 detector-distracao \
   --no-face-threshold 1.2 \
   --eyes-closed-threshold 0.8 \
-  --looking-away-threshold 1.0 \
+  --looking-away-threshold 0.6 \
   --recover-threshold 0.4 \
-  --center-offset-threshold 0.30
+  --center-offset-x-threshold 0.22 \
+  --center-offset-y-threshold 0.20
 ```
 
 Regras de validação da CLI:
@@ -70,17 +72,32 @@ Regras de validação da CLI:
 - `--eyes-closed-threshold > 0`
 - `--looking-away-threshold > 0`
 - `--recover-threshold > 0`
-- `--center-offset-threshold` entre `0.0` e `0.5`
+- `--center-offset-x-threshold` entre `0.0` e `0.5`
+- `--center-offset-y-threshold` entre `0.0` e `0.5`
 
 Teclas:
 
 - `q`: sair
 
-## Como isso melhora a confiabilidade (Fase 2)
+## Como deixar mais sensível para padrões de distração
+
+Se você quer detectar mais rápido olhar para baixo/cima/lado:
+
+```bash
+detector-distracao \
+  --looking-away-threshold 0.4 \
+  --center-offset-x-threshold 0.18 \
+  --center-offset-y-threshold 0.16
+```
+
+Se estiver gerando muitos falsos positivos, aumente esses valores aos poucos.
+
+## Como isso melhora a confiabilidade
 
 - Thresholds em **segundos** ao invés de frames (menos sensível a variação de FPS).
 - Estado temporal com **histerese** para reduzir flicker de alertas.
 - Backend de detecção desacoplado (`HaarSignalDetector`), abrindo caminho para trocar por MediaPipe sem reescrever a CLI/tracker.
+- Classificação de distração por direção (`olhando_esquerda`, `olhando_direita`, `olhando_cima`, `olhando_baixo`).
 
 ## Como testar
 
@@ -93,6 +110,7 @@ python -m pytest
 Cobertura atual inclui:
 
 - Regras de decisão por tempo em `evaluate_attention`.
+- Direções de distração (cima/baixo/esquerda/direita).
 - Comportamento temporal do `AttentionTracker` (acúmulo por segundos, reset e histerese).
 - Validação dos argumentos da CLI e erro amigável sem OpenCV.
 
@@ -102,7 +120,8 @@ Cobertura atual inclui:
 2. Cenários rápidos:
    - Saia da frente da câmera por > `--no-face-threshold`.
    - Feche os olhos por > `--eyes-closed-threshold`.
-   - Desloque-se para borda da imagem por > `--looking-away-threshold`.
+   - Olhe para o lado por > `--looking-away-threshold`.
+   - Olhe para cima e para baixo para validar os novos estados direcionais.
 3. Verifique que o status não volta imediatamente para "atento" ao primeiro frame bom (histerese).
 
 ## Troubleshooting

@@ -39,6 +39,7 @@ class HaarSignalDetector:
         has_face = len(faces) > 0
         has_eyes = False
         face_center_x_ratio = None
+        face_center_y_ratio = None
         face_box = None
         eye_boxes: list[tuple[int, int, int, int]] = []
 
@@ -46,6 +47,7 @@ class HaarSignalDetector:
             x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
             face_box = (x, y, w, h)
             face_center_x_ratio = (x + w / 2) / frame.shape[1]
+            face_center_y_ratio = (y + h / 2) / frame.shape[0]
 
             roi_gray = gray[y : y + h, x : x + w]
             eyes = self.eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=8, minSize=(20, 20))
@@ -59,6 +61,7 @@ class HaarSignalDetector:
                 has_face=has_face,
                 has_eyes=has_eyes,
                 face_center_x_ratio=face_center_x_ratio,
+                face_center_y_ratio=face_center_y_ratio,
             ),
             face_box=face_box,
             eye_boxes=eye_boxes,
