@@ -38,26 +38,33 @@ class DetectorPipeline:
 
     def infer_signals(self, frame: cv2.typing.MatLike) -> InferenceResult:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(60, 60))
+        faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=4, minSize=(50, 50))
 
         has_face = len(faces) > 0
         has_eyes = False
         face_center_x_ratio = None
+        face_center_y_ratio = None
 
         if has_face:
             x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
             face_center_x_ratio = (x + w / 2) / frame.shape[1]
+            face_center_y_ratio = (y + h / 2) / frame.shape[0]
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 180, 0), 2)
 
             roi_gray = gray[y : y + h, x : x + w]
             roi_color = frame[y : y + h, x : x + w]
-            eyes = self.eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=8, minSize=(20, 20))
+            eyes = self.eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=6, minSize=(15, 15))
             has_eyes = len(eyes) >= 1
 
             for ex, ey, ew, eh in eyes[:2]:
                 cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (0, 255, 255), 2)
 
-        signals = FrameSignals(has_face=has_face, has_eyes=has_eyes, face_center_x_ratio=face_center_x_ratio)
+        signals = FrameSignals(
+            has_face=has_face,
+            has_eyes=has_eyes,
+            face_center_x_ratio=face_center_x_ratio,
+            face_center_y_ratio=face_center_y_ratio,
+        )
         return InferenceResult(frame=frame, signals=signals)
 
     def post_process(self, signals: FrameSignals) -> AttentionState:
@@ -120,13 +127,19 @@ def draw_status(frame: cv2.typing.MatLike, status: AttentionState) -> None:
     )
 
 
-def draw_runtime_controls(frame: cv2.typing.MatLike, config: DetectorConfig) -> None:
+def draw_runtime_controls(frame: cv2.typing.MatLike, config: DetectorConfig, counters: FrameCounters | None = None) -> None:
     lines = [
         f"1/2 no_face: {config.no_face_frames_threshold}",
         f"3/4 eyes_closed: {config.eyes_closed_frames_threshold}",
         f"5/6 center_offset: {config.max_center_offset_ratio:.2f}",
         f"7/8 smoothing: {config.smoothing_window_size}",
     ]
+
+    if counters is not None:
+        lines.extend([
+            f"no_face_frames_now: {counters.consecutive_no_face_frames}",
+            f"eyes_closed_frames_now: {counters.consecutive_eyes_closed_frames}",
+        ])
 
     y = 65
     for line in lines:
