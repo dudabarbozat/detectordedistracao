@@ -29,6 +29,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--log-level", default="INFO", help="Nível de log (DEBUG, INFO, WARNING, ERROR).")
     parser.add_argument("--distraction-video-url", default=None, help="URL (ex.: YouTube) para abrir ao detectar distração.")
     parser.add_argument("--video-cooldown-seconds", type=float, default=60.0, help="Cooldown mínimo entre aberturas do vídeo.")
+    parser.add_argument("--blink-frames-threshold", type=int, default=3, help="Frames seguidos com olho fechado (acima de uma piscada) para abrir popup.")
     return parser
 
 
@@ -49,6 +50,7 @@ def main() -> None:
     notifier = DistractionVideoNotifier(
         video_url=args.distraction_video_url,
         cooldown_seconds=max(args.video_cooldown_seconds, 0.0),
+        blink_frames_threshold=max(args.blink_frames_threshold, 1),
     )
 
     cap = cv2.VideoCapture(app_config.runtime.camera_index)
@@ -64,9 +66,21 @@ def main() -> None:
             inference_result = pipeline.infer_signals(frame)
             status = pipeline.post_process(inference_result.signals)
             draw_status(inference_result.frame, status)
-            draw_runtime_controls(inference_result.frame, pipeline.detector_config)
-            if notifier.handle_state(status):
-                logging.getLogger(__name__).info("video_aberto_em_distraction url=%s", args.distraction_video_url)
+            draw_runtime_controls(inference_result.frame, pipeline.detector_config, pipeline.counters)
+            if notifier.handle_detection(
+                state=status,
+                no_face_frames=pipeline.counters.consecutive_no_face_frames,
+                eyes_closed_frames=pipeline.counters.consecutive_eyes_closed_frames,
+                no_face_threshold=pipeline.detector_config.no_face_frames_threshold,
+                eyes_closed_threshold=pipeline.detector_config.eyes_closed_frames_threshold,
+            ):
+                logging.getLogger(__name__).info(
+                    "video_popup_aberto url=%s state=%s no_face_frames=%s eyes_closed_frames=%s",
+                    args.distraction_video_url,
+                    status.value,
+                    pipeline.counters.consecutive_no_face_frames,
+                    pipeline.counters.consecutive_eyes_closed_frames,
+                )
             pipeline.log_metrics()
 
             cv2.imshow("Detector de Distração", inference_result.frame)

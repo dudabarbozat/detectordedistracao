@@ -19,18 +19,37 @@ class FakeOpener:
         return True
 
 
-def test_notifier_opens_on_transition_to_distracted() -> None:
+def test_notifier_opens_when_eyes_closed_longer_than_blink() -> None:
     clock = FakeClock()
     opener = FakeOpener()
     notifier = DistractionVideoNotifier(
         video_url="https://youtube.com/watch?v=test",
         cooldown_seconds=10.0,
+        blink_frames_threshold=3,
         now_provider=clock.now,
         opener=opener,
     )
 
-    assert notifier.handle_state(AttentionState.ATTENTIVE) is False
-    assert notifier.handle_state(AttentionState.DISTRACTED_NO_FACE) is True
+    assert (
+        notifier.handle_detection(
+            state=AttentionState.ATTENTIVE,
+            no_face_frames=0,
+            eyes_closed_frames=2,
+            no_face_threshold=15,
+            eyes_closed_threshold=12,
+        )
+        is False
+    )
+    assert (
+        notifier.handle_detection(
+            state=AttentionState.ATTENTIVE,
+            no_face_frames=0,
+            eyes_closed_frames=3,
+            no_face_threshold=15,
+            eyes_closed_threshold=12,
+        )
+        is True
+    )
     assert opener.urls == ["https://youtube.com/watch?v=test"]
 
 
@@ -40,25 +59,71 @@ def test_notifier_respects_cooldown_between_episodes() -> None:
     notifier = DistractionVideoNotifier(
         video_url="https://youtube.com/watch?v=test",
         cooldown_seconds=10.0,
+        blink_frames_threshold=3,
         now_provider=clock.now,
         opener=opener,
     )
 
-    notifier.handle_state(AttentionState.DISTRACTED_NO_FACE)
-    notifier.handle_state(AttentionState.ATTENTIVE)
+    notifier.handle_detection(
+        state=AttentionState.ATTENTIVE,
+        no_face_frames=0,
+        eyes_closed_frames=3,
+        no_face_threshold=15,
+        eyes_closed_threshold=12,
+    )
+    notifier.handle_detection(
+        state=AttentionState.ATTENTIVE,
+        no_face_frames=0,
+        eyes_closed_frames=0,
+        no_face_threshold=15,
+        eyes_closed_threshold=12,
+    )
     clock.value = 5.0
-    assert notifier.handle_state(AttentionState.DISTRACTED_EYES_CLOSED) is False
+    assert (
+        notifier.handle_detection(
+            state=AttentionState.DISTRACTED_LOOKING_AWAY,
+            no_face_frames=0,
+            eyes_closed_frames=0,
+            no_face_threshold=15,
+            eyes_closed_threshold=12,
+        )
+        is False
+    )
 
     clock.value = 11.0
-    notifier.handle_state(AttentionState.ATTENTIVE)
-    assert notifier.handle_state(AttentionState.DISTRACTED_LOOKING_AWAY) is True
+    notifier.handle_detection(
+        state=AttentionState.ATTENTIVE,
+        no_face_frames=0,
+        eyes_closed_frames=0,
+        no_face_threshold=15,
+        eyes_closed_threshold=12,
+    )
+    assert (
+        notifier.handle_detection(
+            state=AttentionState.DISTRACTED_LOOKING_AWAY,
+            no_face_frames=0,
+            eyes_closed_frames=0,
+            no_face_threshold=15,
+            eyes_closed_threshold=12,
+        )
+        is True
+    )
     assert len(opener.urls) == 2
 
 
 def test_notifier_ignores_when_url_is_missing() -> None:
     notifier = DistractionVideoNotifier(video_url=None)
 
-    assert notifier.handle_state(AttentionState.DISTRACTED_NO_FACE) is False
+    assert (
+        notifier.handle_detection(
+            state=AttentionState.DISTRACTED_NO_FACE,
+            no_face_frames=15,
+            eyes_closed_frames=0,
+            no_face_threshold=15,
+            eyes_closed_threshold=12,
+        )
+        is False
+    )
 
 
 def test_open_video_url_uses_webbrowser_when_available(monkeypatch) -> None:

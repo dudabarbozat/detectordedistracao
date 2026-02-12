@@ -127,13 +127,19 @@ def draw_status(frame: cv2.typing.MatLike, status: AttentionState) -> None:
     )
 
 
-def draw_runtime_controls(frame: cv2.typing.MatLike, config: DetectorConfig) -> None:
+def draw_runtime_controls(frame: cv2.typing.MatLike, config: DetectorConfig, counters: FrameCounters | None = None) -> None:
     lines = [
         f"1/2 no_face: {config.no_face_frames_threshold}",
         f"3/4 eyes_closed: {config.eyes_closed_frames_threshold}",
         f"5/6 center_offset: {config.max_center_offset_ratio:.2f}",
         f"7/8 smoothing: {config.smoothing_window_size}",
     ]
+
+    if counters is not None:
+        lines.extend([
+            f"no_face_frames_now: {counters.consecutive_no_face_frames}",
+            f"eyes_closed_frames_now: {counters.consecutive_eyes_closed_frames}",
+        ])
 
     y = 65
     for line in lines:

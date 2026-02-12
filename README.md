@@ -33,11 +33,13 @@ Com configuração e logs detalhados:
 
 ```bash
 detector-distracao --config detector.toml --log-level DEBUG \
-  --distraction-video-url "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  --distraction-video-url "https://www.youtube.com/watch?v=dQw4w9WgXcQ" \
+  --blink-frames-threshold 3
 ```
 
 
-Se passar `--distraction-video-url`, o app abre o link (YouTube ou outro) quando há transição de **atento -> distraído**.
+Se passar `--distraction-video-url`, o app abre o link em **popup/janela do navegador** quando detecta distração.
+Também abre quando os olhos ficam fechados por mais de uma piscada (`--blink-frames-threshold`, padrão 3 frames).
 Use `--video-cooldown-seconds` para controlar intervalo mínimo entre aberturas.
 
 
