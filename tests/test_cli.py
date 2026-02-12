@@ -10,16 +10,22 @@ def test_parse_args_accepts_valid_values() -> None:
         "--camera",
         "1",
         "--no-face-threshold",
-        "10",
+        "1.0",
         "--eyes-closed-threshold",
-        "5",
+        "0.5",
+        "--looking-away-threshold",
+        "0.9",
+        "--recover-threshold",
+        "0.3",
         "--center-offset-threshold",
         "0.2",
     ])
 
     assert args.camera == 1
-    assert args.no_face_threshold == 10
-    assert args.eyes_closed_threshold == 5
+    assert args.no_face_threshold == 1.0
+    assert args.eyes_closed_threshold == 0.5
+    assert args.looking_away_threshold == 0.9
+    assert args.recover_threshold == 0.3
     assert args.center_offset_threshold == 0.2
 
 
@@ -29,6 +35,8 @@ def test_parse_args_accepts_valid_values() -> None:
         ["--camera", "-1"],
         ["--no-face-threshold", "0"],
         ["--eyes-closed-threshold", "0"],
+        ["--looking-away-threshold", "0"],
+        ["--recover-threshold", "0"],
         ["--center-offset-threshold", "0.8"],
         ["--center-offset-threshold", "-0.1"],
     ],

@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 from typing import TYPE_CHECKING, Any
 
-from .logic import AttentionState, DetectorConfig, FrameSignals
+from .logic import AttentionState, DetectorConfig
 from .tracker import AttentionTracker
+from .vision import HaarSignalDetector
 
 if TYPE_CHECKING:
     import cv2
@@ -14,8 +15,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Detector de distração em tempo real")
     parser.add_argument("--camera", type=int, default=0, help="Índice da câmera (padrão: 0)")
     parser.add_argument("--source", type=str, default=None, help="Arquivo de vídeo para teste (opcional)")
-    parser.add_argument("--no-face-threshold", type=int, default=30, help="Frames seguidos sem rosto para alertar")
-    parser.add_argument("--eyes-closed-threshold", type=int, default=20, help="Frames seguidos com olhos fechados")
+    parser.add_argument("--no-face-threshold", type=float, default=1.2, help="Segundos sem rosto para alertar")
+    parser.add_argument("--eyes-closed-threshold", type=float, default=0.8, help="Segundos com olhos fechados")
+    parser.add_argument("--looking-away-threshold", type=float, default=1.0, help="Segundos olhando para longe")
+    parser.add_argument("--recover-threshold", type=float, default=0.4, help="Segundos atentos para sair de alerta")
     parser.add_argument(
         "--center-offset-threshold",
         type=float,
@@ -42,6 +45,12 @@ def _validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) ->
     if args.eyes_closed_threshold <= 0:
         parser.error("--eyes-closed-threshold deve ser > 0")
 
+    if args.looking_away_threshold <= 0:
+        parser.error("--looking-away-threshold deve ser > 0")
+
+    if args.recover_threshold <= 0:
+        parser.error("--recover-threshold deve ser > 0")
+
     if not 0.0 <= args.center_offset_threshold <= 0.5:
         parser.error("--center-offset-threshold deve estar entre 0.0 e 0.5")
 
@@ -55,19 +64,6 @@ def _import_cv2() -> Any:
             "(ou `pip install -e .[dev]`) e tente novamente."
         ) from exc
     return cv2
-
-
-def _load_cascades(cv2_module: Any) -> tuple[Any, Any]:
-    face_path = cv2_module.data.haarcascades + "haarcascade_frontalface_default.xml"
-    eye_path = cv2_module.data.haarcascades + "haarcascade_eye.xml"
-
-    face_cascade = cv2_module.CascadeClassifier(face_path)
-    eye_cascade = cv2_module.CascadeClassifier(eye_path)
-
-    if face_cascade.empty() or eye_cascade.empty():
-        raise RuntimeError("Não foi possível carregar os classificadores Haar do OpenCV.")
-
-    return face_cascade, eye_cascade
 
 
 def _put_status(cv2_module: Any, frame: Any, status: AttentionState) -> None:
@@ -84,17 +80,28 @@ def _put_status(cv2_module: Any, frame: Any, status: AttentionState) -> None:
     )
 
 
+def _draw_detections(cv2_module: Any, frame: Any, face_box: tuple[int, int, int, int] | None, eye_boxes: list[tuple[int, int, int, int]]) -> None:
+    if face_box is not None:
+        x, y, w, h = face_box
+        cv2_module.rectangle(frame, (x, y), (x + w, y + h), (255, 180, 0), 2)
+
+    for ex, ey, ew, eh in eye_boxes:
+        cv2_module.rectangle(frame, (ex, ey), (ex + ew, ey + eh), (0, 255, 255), 2)
+
+
 def main() -> None:
     args = parse_args()
     config = DetectorConfig(
-        no_face_frames_threshold=args.no_face_threshold,
-        eyes_closed_frames_threshold=args.eyes_closed_threshold,
+        no_face_seconds_threshold=args.no_face_threshold,
+        eyes_closed_seconds_threshold=args.eyes_closed_threshold,
+        looking_away_seconds_threshold=args.looking_away_threshold,
+        recover_seconds_threshold=args.recover_threshold,
         max_center_offset_ratio=args.center_offset_threshold,
     )
     tracker = AttentionTracker(config=config)
 
     cv2 = _import_cv2()
-    face_cascade, eye_cascade = _load_cascades(cv2)
+    detector = HaarSignalDetector(cv2)
 
     source = args.source if args.source is not None else args.camera
     cap = cv2.VideoCapture(source)
@@ -107,33 +114,10 @@ def main() -> None:
             if not ok:
                 break
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(60, 60))
+            detection = detector.detect(frame)
+            status = tracker.update(detection.signals)
 
-            has_face = len(faces) > 0
-            has_eyes = False
-            face_center_x_ratio = None
-
-            if has_face:
-                x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
-                face_center_x_ratio = (x + w / 2) / frame.shape[1]
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 180, 0), 2)
-
-                roi_gray = gray[y : y + h, x : x + w]
-                roi_color = frame[y : y + h, x : x + w]
-                eyes = eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=8, minSize=(20, 20))
-                has_eyes = len(eyes) >= 1
-
-                for ex, ey, ew, eh in eyes[:2]:
-                    cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (0, 255, 255), 2)
-
-            signals = FrameSignals(
-                has_face=has_face,
-                has_eyes=has_eyes,
-                face_center_x_ratio=face_center_x_ratio,
-            )
-            status = tracker.update(signals)
-
+            _draw_detections(cv2, frame, detection.face_box, detection.eye_boxes)
             _put_status(cv2, frame, status)
             cv2.imshow("Detector de Distração", frame)
 

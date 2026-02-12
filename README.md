@@ -1,14 +1,13 @@
 # Detector de Distração (Python)
 
-MVP de detector de distração em tempo real usando webcam ou vídeo.
+Detector de distração em tempo real usando webcam ou vídeo, com foco em confiabilidade temporal.
 
 ## O que detecta
 
-- **Sem rosto visível** por um período contínuo.
-- **Olhos fechados** por vários frames seguidos.
-- **Rosto muito fora do centro** da tela (indicador de olhar para longe).
-
-> Observação: este projeto é um ponto de partida. Para produção, o ideal é evoluir com landmarks faciais (ex.: MediaPipe).
+- **Sem rosto visível** por um período contínuo (em segundos).
+- **Olhos fechados** por um período contínuo (em segundos).
+- **Rosto fora do centro** por um período contínuo (em segundos).
+- **Recuperação com histerese**: precisa manter atenção por alguns segundos antes de sair de alerta.
 
 ## Requisitos
 
@@ -47,25 +46,21 @@ detector-distracao --help
 detector-distracao
 ```
 
-### 3) Outra câmera
-
-```bash
-detector-distracao --camera 1
-```
-
-### 4) Testar com arquivo de vídeo
+### 3) Testar com arquivo de vídeo
 
 ```bash
 detector-distracao --source caminho/para/video.mp4
 ```
 
-### 5) Ajustar sensibilidade
+### 4) Ajustar confiabilidade temporal (segundos)
 
 ```bash
 detector-distracao \
-  --no-face-threshold 40 \
-  --eyes-closed-threshold 25 \
-  --center-offset-threshold 0.25
+  --no-face-threshold 1.2 \
+  --eyes-closed-threshold 0.8 \
+  --looking-away-threshold 1.0 \
+  --recover-threshold 0.4 \
+  --center-offset-threshold 0.30
 ```
 
 Regras de validação da CLI:
@@ -73,11 +68,19 @@ Regras de validação da CLI:
 - `--camera >= 0`
 - `--no-face-threshold > 0`
 - `--eyes-closed-threshold > 0`
+- `--looking-away-threshold > 0`
+- `--recover-threshold > 0`
 - `--center-offset-threshold` entre `0.0` e `0.5`
 
 Teclas:
 
 - `q`: sair
+
+## Como isso melhora a confiabilidade (Fase 2)
+
+- Thresholds em **segundos** ao invés de frames (menos sensível a variação de FPS).
+- Estado temporal com **histerese** para reduzir flicker de alertas.
+- Backend de detecção desacoplado (`HaarSignalDetector`), abrindo caminho para trocar por MediaPipe sem reescrever a CLI/tracker.
 
 ## Como testar
 
@@ -87,57 +90,39 @@ Teclas:
 python -m pytest
 ```
 
-Cobertura atual:
+Cobertura atual inclui:
 
-- Regras de decisão da função `evaluate_attention`.
-- Comportamento temporal do `AttentionTracker` (acúmulo e reset de contadores).
-- Validação dos argumentos da CLI e erro amigável quando OpenCV não está instalado.
+- Regras de decisão por tempo em `evaluate_attention`.
+- Comportamento temporal do `AttentionTracker` (acúmulo por segundos, reset e histerese).
+- Validação dos argumentos da CLI e erro amigável sem OpenCV.
 
 ### Teste manual (com webcam)
 
 1. Rode `detector-distracao`.
 2. Cenários rápidos:
-   - Saia da frente da câmera por alguns segundos (esperado: `distraido_sem_rosto`).
-   - Feche os olhos por alguns frames (esperado: `distraido_olhos_fechados`).
-   - Vá para o canto da imagem (esperado: `distraido_olhando_longe`).
+   - Saia da frente da câmera por > `--no-face-threshold`.
+   - Feche os olhos por > `--eyes-closed-threshold`.
+   - Desloque-se para borda da imagem por > `--looking-away-threshold`.
+3. Verifique que o status não volta imediatamente para "atento" ao primeiro frame bom (histerese).
 
 ## Troubleshooting
 
 - **Erro `OpenCV não está instalado`**:
   - execute `pip install opencv-python`.
 - **Ambiente sem acesso à internet/proxy**:
-  - prefira usar um ambiente local com internet para instalar dependências;
+  - prefira um ambiente local com internet para instalar dependências;
   - ou use wheel local previamente baixado.
-
-## Como evoluir
-
-Sugestão de roadmap prático:
-
-1. **Melhorar precisão**
-   - Trocar Haar Cascades por landmarks (MediaPipe Face Mesh).
-   - Calcular EAR (Eye Aspect Ratio) para detectar sonolência com mais robustez.
-
-2. **Reduzir falsos positivos**
-   - Suavização temporal (média móvel / histerese).
-   - Thresholds por usuário (fase de calibração inicial).
-
-3. **Observabilidade**
-   - Log de eventos em CSV/JSON com timestamp.
-   - Dashboard simples com frequência de distrações por minuto.
-
-4. **Produto/Deploy**
-   - API local (FastAPI) para servir estado em tempo real.
-   - Empacotar em Docker e adicionar CI para rodar testes automaticamente.
 
 ## Estrutura
 
 ```text
 src/detector/
-  cli.py      # captura de vídeo e renderização
-  logic.py    # regras de atenção/distração
-  tracker.py  # estado temporal (contadores)
+  cli.py      # execução e renderização
+  logic.py    # regras de atenção/distração por tempo
+  tracker.py  # estado temporal + histerese
+  vision.py   # backend de sinais (Haar)
 tests/
+  test_cli.py
   test_logic.py
   test_tracker.py
-  test_cli.py
 ```
