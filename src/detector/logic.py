@@ -16,6 +16,13 @@ class DetectorConfig:
     no_face_frames_threshold: int = 30
     eyes_closed_frames_threshold: int = 20
     max_center_offset_ratio: float = 0.30
+    smoothing_window_size: int = 5
+
+
+@dataclass(frozen=True)
+class RuntimeConfig:
+    camera_index: int = 0
+    metrics_log_interval_frames: int = 30
 
 
 @dataclass
@@ -23,6 +30,25 @@ class FrameSignals:
     has_face: bool
     has_eyes: bool
     face_center_x_ratio: float | None
+
+
+@dataclass(frozen=True)
+class FrameCounters:
+    consecutive_no_face_frames: int = 0
+    consecutive_eyes_closed_frames: int = 0
+
+
+def update_frame_counters(
+    counters: FrameCounters,
+    has_face: bool,
+    has_eyes: bool,
+) -> FrameCounters:
+    no_face_frames = counters.consecutive_no_face_frames + 1 if not has_face else 0
+    eyes_closed_frames = counters.consecutive_eyes_closed_frames + 1 if has_face and not has_eyes else 0
+    return FrameCounters(
+        consecutive_no_face_frames=no_face_frames,
+        consecutive_eyes_closed_frames=eyes_closed_frames,
+    )
 
 
 def evaluate_attention(

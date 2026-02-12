@@ -29,9 +29,40 @@ pip install -e .[dev]
 detector-distracao
 ```
 
+Com configuração e logs detalhados:
+
+```bash
+detector-distracao --config detector.toml --log-level DEBUG \
+  --distraction-video-url "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
+
+Se passar `--distraction-video-url`, o app abre o link (YouTube ou outro) quando há transição de **atento -> distraído**.
+Use `--video-cooldown-seconds` para controlar intervalo mínimo entre aberturas.
+
 Teclas:
 
 - `q`: sair
+- `1`/`2`: diminuir/aumentar limiar de sem rosto
+- `3`/`4`: diminuir/aumentar limiar de olhos fechados
+- `5`/`6`: diminuir/aumentar tolerância de desvio do centro
+- `7`/`8`: diminuir/aumentar janela de suavização temporal
+
+## Configuração (`detector.toml`)
+
+```toml
+[detector]
+no_face_frames_threshold = 30
+eyes_closed_frames_threshold = 20
+max_center_offset_ratio = 0.30
+smoothing_window_size = 5
+
+[runtime]
+camera_index = 0
+metrics_log_interval_frames = 30
+```
+
+O parâmetro `smoothing_window_size` aplica votação temporal para estabilizar mudanças rápidas de estado.
 
 ## Testes
 
