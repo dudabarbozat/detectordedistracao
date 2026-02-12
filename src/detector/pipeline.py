@@ -7,6 +7,7 @@ from time import perf_counter
 import cv2
 
 from .logic import AttentionState, DetectorConfig, FrameCounters, FrameSignals, update_frame_counters
+from .smoothing import TemporalStateSmoother
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class DetectorPipeline:
         self.counters = FrameCounters()
         self.frame_count = 0
         self.start_time = perf_counter()
+        self.smoother = TemporalStateSmoother(self.detector_config.smoothing_window_size)
 
     def infer_signals(self, frame: cv2.typing.MatLike) -> InferenceResult:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -59,7 +61,8 @@ class DetectorPipeline:
 
     def post_process(self, signals: FrameSignals) -> AttentionState:
         self.counters = update_frame_counters(self.counters, has_face=signals.has_face, has_eyes=signals.has_eyes)
-        return self._evaluate(signals)
+        raw_state = self._evaluate(signals)
+        return self.smoother.push(raw_state)
 
     def _evaluate(self, signals: FrameSignals) -> AttentionState:
         from .logic import evaluate_attention

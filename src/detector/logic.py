@@ -16,6 +16,7 @@ class DetectorConfig:
     no_face_frames_threshold: int = 30
     eyes_closed_frames_threshold: int = 20
     max_center_offset_ratio: float = 0.30
+    smoothing_window_size: int = 5
 
 
 @dataclass(frozen=True)

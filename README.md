@@ -46,11 +46,14 @@ Teclas:
 no_face_frames_threshold = 30
 eyes_closed_frames_threshold = 20
 max_center_offset_ratio = 0.30
+smoothing_window_size = 5
 
 [runtime]
 camera_index = 0
 metrics_log_interval_frames = 30
 ```
+
+O parâmetro `smoothing_window_size` aplica votação temporal para estabilizar mudanças rápidas de estado.
 
 ## Testes
 

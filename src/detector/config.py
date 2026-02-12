@@ -33,6 +33,7 @@ def load_app_config(config_path: str | None) -> AppConfig:
             DetectorConfig.eyes_closed_frames_threshold,
         ),
         max_center_offset_ratio=detector_data.get("max_center_offset_ratio", DetectorConfig.max_center_offset_ratio),
+        smoothing_window_size=detector_data.get("smoothing_window_size", DetectorConfig.smoothing_window_size),
     )
 
     runtime = RuntimeConfig(
