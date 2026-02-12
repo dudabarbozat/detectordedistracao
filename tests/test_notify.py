@@ -55,7 +55,23 @@ def test_notifier_respects_cooldown_between_episodes() -> None:
     assert len(opener.urls) == 2
 
 
+def test_notifier_allows_manual_open_for_testing() -> None:
+    clock = FakeClock()
+    opener = FakeOpener()
+    notifier = DistractionVideoNotifier(
+        video_url="https://youtube.com/watch?v=test",
+        cooldown_seconds=10.0,
+        now_provider=clock.now,
+        opener=opener,
+    )
+
+    assert notifier.open_now() is True
+    clock.value = 1.0
+    assert notifier.open_now() is False
+
+
 def test_notifier_ignores_when_url_is_missing() -> None:
     notifier = DistractionVideoNotifier(video_url=None)
 
     assert notifier.handle_state(AttentionState.DISTRACTED_NO_FACE) is False
+    assert notifier.open_now() is False

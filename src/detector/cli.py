@@ -71,14 +71,21 @@ def main() -> None:
             status = pipeline.post_process(inference_result.signals)
             draw_status(inference_result.frame, status)
             draw_runtime_controls(inference_result.frame, pipeline.detector_config)
+            logger = logging.getLogger(__name__)
             if notifier.handle_state(status):
-                logging.getLogger(__name__).info("video_aberto_em_distraction url=%s", args.distraction_video_url)
+                logger.info("video_aberto_em_distraction url=%s", args.distraction_video_url)
             pipeline.log_metrics()
 
             cv2.imshow("Detector de Distração", inference_result.frame)
             key_code = cv2.waitKey(1) & 0xFF
             if key_code == ord("q"):
                 break
+            if key_code == ord("v"):
+                if notifier.open_now():
+                    logger.info("video_aberto_em_teste_manual url=%s", args.distraction_video_url)
+                else:
+                    logger.warning("falha_ao_abrir_video_teste url=%s cooldown=%.1fs", args.distraction_video_url, args.video_cooldown_seconds)
+                continue
             pipeline.apply_realtime_control(key_code)
     finally:
         cap.release()

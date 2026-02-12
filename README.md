@@ -32,16 +32,18 @@ detector-distracao
 Com configuração e logs detalhados:
 
 ```bash
-detector-distracao --config detector.toml --log-level DEBUG
+detector-distracao --config detector.toml --log-level DEBUG --video-cooldown-seconds 0
 ```
 
 
 O app abre por padrão o vídeo `https://www.youtube.com/shorts/3tSGAhyQAKA` quando há transição de **atento -> distraído**.
 Você pode trocar com `--distraction-video-url` e usar `--video-cooldown-seconds` para controlar intervalo mínimo entre aberturas.
+Para teste rápido, pressione `v` para forçar abertura manual do vídeo (respeita cooldown).
 
 Teclas:
 
 - `q`: sair
+- `v`: testar abertura manual do vídeo
 - `1`/`2`: diminuir/aumentar limiar de sem rosto
 - `3`/`4`: diminuir/aumentar limiar de olhos fechados
 - `5`/`6`: diminuir/aumentar tolerância de desvio do centro
