@@ -32,8 +32,13 @@ detector-distracao
 Com configuração e logs detalhados:
 
 ```bash
-detector-distracao --config detector.toml --log-level DEBUG
+detector-distracao --config detector.toml --log-level DEBUG \
+  --distraction-video-url "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 ```
+
+
+Se passar `--distraction-video-url`, o app abre o link (YouTube ou outro) quando há transição de **atento -> distraído**.
+Use `--video-cooldown-seconds` para controlar intervalo mínimo entre aberturas.
 
 Teclas:
 

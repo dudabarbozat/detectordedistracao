@@ -3,6 +3,7 @@
 from .logic import AttentionState, DetectorConfig, FrameCounters, FrameSignals, RuntimeConfig, evaluate_attention
 from .smoothing import TemporalStateSmoother
 from .control import adjust_config_from_key
+from .notify import DistractionVideoNotifier
 
 __all__ = [
     "AttentionState",
@@ -13,4 +14,5 @@ __all__ = [
     "evaluate_attention",
     "TemporalStateSmoother",
     "adjust_config_from_key",
+    "DistractionVideoNotifier",
 ]
